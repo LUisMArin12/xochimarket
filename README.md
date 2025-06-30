@@ -43,7 +43,7 @@ Xochimarket es una plataforma de comercio electrónico diseñada para facilitar 
 - `/tests` - Pruebas automatizadas
 
 ## Colaboradores
-- Luis Carlos Marín Ramírez - Desarrollador principal
+- Luis Carlos Marín Ramírez - Analista de Negocios
 
 ## Licencia
 [Especifica la licencia, por ejemplo MIT]
