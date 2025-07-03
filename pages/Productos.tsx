@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
-import { Heart, ShoppingCart, Star, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, ShoppingCart, Star, ArrowLeft, Loader } from 'lucide-react';
 
 const ProductsApp = () => {
   const [currentView, setCurrentView] = useState('list');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [favorites, setFavorites] = useState(new Set());
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [cartItems, setCartItems] = useState([]);
 
-  // Datos de ejemplo - Ropa Mexicana
-  const products = [
+  // Simulación de API Backend
+  const API_BASE = 'https://api.ropamexicana.com/v1';
+  
+  // Datos de productos simulados
+  const mockProducts = [
     {
       id: 1,
       name: 'Huipil Bordado de Oaxaca',
@@ -18,7 +24,9 @@ const ProductsApp = () => {
       reviews: 87,
       category: 'Huipiles',
       origin: 'Oaxaca',
-      material: 'Algodón bordado a mano'
+      material: 'Algodón bordado a mano',
+      stock: 15,
+      sku: 'HUI-OAX-001'
     },
     {
       id: 2,
@@ -29,7 +37,9 @@ const ProductsApp = () => {
       reviews: 64,
       category: 'Rebozos',
       origin: 'Michoacán',
-      material: 'Seda natural'
+      material: 'Seda natural',
+      stock: 8,
+      sku: 'REB-MIC-002'
     },
     {
       id: 3,
@@ -41,7 +51,9 @@ const ProductsApp = () => {
       reviews: 103,
       category: 'Guayaberas',
       origin: 'Yucatán',
-      material: 'Lino bordado'
+      material: 'Lino bordado',
+      stock: 23,
+      sku: 'GUA-YUC-003'
     },
     {
       id: 4,
@@ -52,7 +64,9 @@ const ProductsApp = () => {
       reviews: 45,
       category: 'Faldas',
       origin: 'Istmo de Tehuantepec',
-      material: 'Terciopelo con flores bordadas'
+      material: 'Terciopelo con flores bordadas',
+      stock: 5,
+      sku: 'FAL-TEH-004'
     },
     {
       id: 5,
@@ -63,7 +77,9 @@ const ProductsApp = () => {
       reviews: 72,
       category: 'Ponchos',
       origin: 'Coahuila',
-      material: 'Lana virgen tejida'
+      material: 'Lana virgen tejida',
+      stock: 12,
+      sku: 'PON-COA-005'
     },
     {
       id: 6,
@@ -75,23 +91,135 @@ const ProductsApp = () => {
       reviews: 91,
       category: 'Vestidos',
       origin: 'Puebla',
-      material: 'Manta bordada con hilo de colores'
+      material: 'Manta bordada con hilo de colores',
+      stock: 18,
+      sku: 'VES-PUE-006'
     }
   ];
 
-  const toggleFavorite = (productId) => {
-    const newFavorites = new Set(favorites);
-    if (newFavorites.has(productId)) {
-      newFavorites.delete(productId);
-    } else {
-      newFavorites.add(productId);
+  // Simulación de llamadas API
+  const apiCall = async (endpoint, options = {}) => {
+    // Simular delay de red
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 200));
+    
+    console.log(`API Call: ${endpoint}`, options);
+    
+    switch (endpoint) {
+      case '/products':
+        return { data: mockProducts, status: 'success' };
+      case '/favorites':
+        return { data: Array.from(favorites), status: 'success' };
+      case '/cart':
+        return { data: cartItems, status: 'success' };
+      default:
+        return { data: null, status: 'success' };
     }
-    setFavorites(newFavorites);
   };
 
-  const showProductDetail = (product) => {
-    setSelectedProduct(product);
-    setCurrentView('detail');
+  // Cargar productos al iniciar
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await apiCall('/products');
+        if (response.status === 'success') {
+          setProducts(response.data);
+        }
+      } catch (error) {
+        console.error('Error loading products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
+  }, []);
+
+  // Cargar favoritos del usuario
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const response = await apiCall('/favorites');
+        if (response.status === 'success') {
+          setFavorites(new Set(response.data));
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error);
+      }
+    };
+
+    loadFavorites();
+  }, []);
+
+  const toggleFavorite = async (productId) => {
+    try {
+      const newFavorites = new Set(favorites);
+      const action = newFavorites.has(productId) ? 'remove' : 'add';
+      
+      if (action === 'remove') {
+        newFavorites.delete(productId);
+      } else {
+        newFavorites.add(productId);
+      }
+      
+      // Actualizar UI inmediatamente
+      setFavorites(newFavorites);
+      
+      // Enviar al backend
+      await apiCall(`/favorites/${productId}`, {
+        method: action === 'add' ? 'POST' : 'DELETE',
+        body: JSON.stringify({ productId, userId: 'user_123' })
+      });
+      
+    } catch (error) {
+      console.error('Error updating favorite:', error);
+      // Revertir cambio en caso de error
+      setFavorites(prev => {
+        const reverted = new Set(prev);
+        if (reverted.has(productId)) {
+          reverted.delete(productId);
+        } else {
+          reverted.add(productId);
+        }
+        return reverted;
+      });
+    }
+  };
+
+  const addToCart = async (product, quantity = 1) => {
+    try {
+      const response = await apiCall('/cart/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          productId: product.id,
+          quantity: quantity,
+          userId: 'user_123'
+        })
+      });
+      
+      if (response.status === 'success') {
+        setCartItems(prev => [...prev, { ...product, quantity }]);
+        console.log(`Added ${product.name} to cart`);
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+    }
+  };
+
+  const showProductDetail = async (product) => {
+    try {
+      // Obtener detalles completos del producto
+      const response = await apiCall(`/products/${product.id}`);
+      if (response.status === 'success') {
+        setSelectedProduct(product);
+        setCurrentView('detail');
+      }
+    } catch (error) {
+      console.error('Error loading product details:', error);
+      // Mostrar con datos básicos si falla
+      setSelectedProduct(product);
+      setCurrentView('detail');
+    }
   };
 
   const goBackToList = () => {
@@ -99,12 +227,27 @@ const ProductsApp = () => {
     setSelectedProduct(null);
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="animate-spin mx-auto mb-4 text-red-600" size={48} />
+          <p className="text-gray-600">Cargando productos...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Vista de Lista de Productos
   const ProductList = () => (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Ropa Tradicional Mexicana</h1>
         <p className="text-gray-600">Auténticas piezas artesanales hechas a mano por maestros artesanos</p>
+        <div className="mt-2 text-sm text-gray-500">
+          {products.length} productos disponibles
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -125,17 +268,22 @@ const ProductsApp = () => {
                   e.stopPropagation();
                   toggleFavorite(product.id);
                 }}
-                className={absolute top-3 right-3 p-2 rounded-full ${
+                className={`absolute top-3 right-3 p-2 rounded-full ${
                   favorites.has(product.id) 
                     ? 'bg-red-500 text-white' 
                     : 'bg-white text-gray-400 hover:text-red-500'
-                } transition-colors duration-200}
+                } transition-colors duration-200`}
               >
                 <Heart size={20} fill={favorites.has(product.id) ? 'currentColor' : 'none'} />
               </button>
               {product.originalPrice && (
                 <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-lg text-sm font-medium">
                   Oferta
+                </span>
+              )}
+              {product.stock < 10 && (
+                <span className="absolute bottom-3 left-3 bg-orange-500 text-white px-2 py-1 rounded-lg text-xs">
+                  Solo {product.stock} disponibles
                 </span>
               )}
             </div>
@@ -169,9 +317,10 @@ const ProductsApp = () => {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    // Aquí iría la lógica para agregar al carrito
+                    addToCart(product);
                   }}
                   className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors duration-200"
+                  disabled={product.stock === 0}
                 >
                   <ShoppingCart size={18} />
                 </button>
@@ -205,14 +354,25 @@ const ProductsApp = () => {
             />
             <button
               onClick={() => toggleFavorite(selectedProduct.id)}
-              className={absolute top-4 right-4 p-3 rounded-full ${
+              className={`absolute top-4 right-4 p-3 rounded-full ${
                 favorites.has(selectedProduct.id) 
                   ? 'bg-red-500 text-white' 
                   : 'bg-white text-gray-400 hover:text-red-500'
-              } transition-colors duration-200 shadow-lg}
+              } transition-colors duration-200 shadow-lg`}
             >
               <Heart size={24} fill={favorites.has(selectedProduct.id) ? 'currentColor' : 'none'} />
             </button>
+          </div>
+          
+          <div className="text-sm text-gray-500 bg-gray-100 p-3 rounded-lg">
+            <div className="flex justify-between mb-1">
+              <span>SKU:</span>
+              <span className="font-mono">{selectedProduct.sku}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Stock disponible:</span>
+              <span className="font-semibold">{selectedProduct.stock} unidades</span>
+            </div>
           </div>
         </div>
         
@@ -233,7 +393,7 @@ const ProductsApp = () => {
                   <Star 
                     key={i} 
                     size={20} 
-                    className={${i < Math.floor(selectedProduct.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}} 
+                    className={`${i < Math.floor(selectedProduct.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
                   />
                 ))}
                 <span className="text-lg text-gray-700 ml-2">{selectedProduct.rating}</span>
@@ -256,12 +416,19 @@ const ProductsApp = () => {
             </div>
             
             <div className="space-y-4">
-              <button className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-semibold text-lg transition-colors duration-200 flex items-center justify-center gap-2">
+              <button 
+                onClick={() => addToCart(selectedProduct)}
+                disabled={selectedProduct.stock === 0}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-4 rounded-lg font-semibold text-lg transition-colors duration-200 flex items-center justify-center gap-2"
+              >
                 <ShoppingCart size={24} />
-                Agregar al Carrito
+                {selectedProduct.stock > 0 ? 'Agregar al Carrito' : 'Agotado'}
               </button>
               
-              <button className="w-full border-2 border-gray-300 hover:border-gray-400 text-gray-700 py-4 rounded-lg font-semibold text-lg transition-colors duration-200">
+              <button 
+                disabled={selectedProduct.stock === 0}
+                className="w-full border-2 border-gray-300 hover:border-gray-400 disabled:border-gray-200 disabled:text-gray-400 text-gray-700 py-4 rounded-lg font-semibold text-lg transition-colors duration-200"
+              >
                 Comprar Ahora
               </button>
             </div>
